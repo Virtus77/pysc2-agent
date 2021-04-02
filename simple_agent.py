@@ -1,12 +1,20 @@
 from pysc2.agents import base_agent
 from pysc2.env import sc2_env
-from pysc2.lib import actions, features
+from pysc2.lib import actions, features, units
 from absl import app
+import random
+
 class SimpleAgent(base_agent.BaseAgent):
     def step(self, obs):
         super(SimpleAgent, self).step(obs)
-        
+        # get a list of all SCVs on the screen
+        scvs = [unit for unit in obs.observation.feature_units
+                if unit.unit_type == units.Terran.SCV]
+        if len(scvs) > 0:
+            scv = random.choice(scvs)
+            return actions.FUNCTIONS.select_point("select_all_type", (scv.x, scv.y))
         return actions.FUNCTIONS.no_op()
+        
 def main(unused_argv):
     agent = SimpleAgent()
     try:
@@ -19,7 +27,8 @@ def main(unused_argv):
                                         sc2_env.Difficulty.very_easy)],
                     # specify the screen and minimap resolutions
                     agent_interface_format = features.AgentInterfaceFormat(
-                    feature_dimensions = features.Dimensions(screen=84, minimap=84)),
+                        feature_dimensions = features.Dimensions(screen=84, minimap=84),
+                        use_feature_units=True),
                     # how many "game steps" pass before the bot will choose an action to take
                     # default is set to 8, approximately 300 APM on "Normal" game speed
                     # set it to 160 to reduce the APM to 150
