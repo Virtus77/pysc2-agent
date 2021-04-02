@@ -19,31 +19,55 @@ class SimpleAgent(base_agent.BaseAgent):
         return [unit for unit in obs.observation.feature_units
                 if unit.unit_type == unit_type]
                 
+    def can_do(self, obs, action):
+        return action in obs.observation.available_actions
+        
     def step(self, obs):
         super(SimpleAgent, self).step(obs)
         
         supply_depots = self.get_units_by_type(obs, units.Terran.SupplyDepot)
         if len(supply_depots) == 0:
             if self.unit_type_is_selected(obs, units.Terran.SCV):
-                if(actions.FUNCTIONS.Build_SupplyDepot_screen.id in
-                    obs.observation.available_actions):
+                if self.can_do(obs, actions.FUNCTIONS.Build_SupplyDepot_screen.id):
                     x = random.randint(0, 83)
                     y = random.randint(0, 83)
                     return actions.FUNCTIONS.Build_SupplyDepot_screen("now", (x, y))
         
         barracks = self.get_units_by_type(obs, units.Terran.Barracks)
-        if len(barracks) == 0 and len(barracks) < 3:
+        if len(barracks) == 0 or len(barracks) < 3:
            if self.unit_type_is_selected(obs, units.Terran.SCV):
-                if(actions.FUNCTIONS.Build_Barracks_screen.id in
-                    obs.observation.available_actions):
+                if self.can_do(obs, actions.FUNCTIONS.Build_Barracks_screen.id):
                     x = random.randint(0, 83)
                     y = random.randint(0, 83)
                     return actions.FUNCTIONS.Build_Barracks_screen("now", (x,y))
+                
+        free_supply = (obs.observation.player.food_cap - obs.observation.player.food_used)
+        if free_supply == 0:
+            if self.unit_type_is_selected(obs, units.Terran.SCV):
+                if self.can_do(obs, actions.FUNCTIONS.Build_SupplyDepot_screen.id):
+                    x = random.randint(0, 83)
+                    y = random.randint(0, 83)
+                    return actions.FUNCTIONS.Build_SupplyDepot_screen("now", (x, y))
+                    
+        barracks = self.get_units_by_type(obs, units.Terran.Barracks)
+        if len(barracks) > 0:
+            if self.unit_type_is_selected(obs, units.Terran.Barracks):
+                if self.can_do(obs, actions.FUNCTIONS.Train_Marine_quick.id):
+                    return actions.FUNCTIONS.Train_Marine_quick("now")
+            else:
+                barrack = random.choice(barracks)
+                x = max(0, barrack.x)
+                y = max(0, barrack.y)
+                return actions.FUNCTIONS.select_point("select_all_type", (x,y))
+                        
         # get a list of all SCVs on the screen
+        
         scvs = self.get_units_by_type(obs, units.Terran.SCV)
         if len(scvs) > 0:
             scv = random.choice(scvs)
-            return actions.FUNCTIONS.select_point("select_all_type", (scv.x, scv.y))
+            x = max(0, scv.x)
+            y = max(0, scv.y)
+            return actions.FUNCTIONS.select_point("select_all_type", (x, y))
         return actions.FUNCTIONS.no_op()
     
 def main(unused_argv):
