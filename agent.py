@@ -7,6 +7,8 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions, features, units
 from pysc2.env import sc2_env, run_loop
 
+DATA_FILE = 'agent_data'
+
 class QLearningTable:
     def __init__(self, actions, learning_rate = 0.01, reward_decay=0.9):
         self.actions = actions
@@ -150,6 +152,8 @@ class SmartAgent(Agent):
         super(SmartAgent, self).__init__()
         self.qtable = QLearningTable(self.actions)
         self.new_game()
+        if os.path.isfile(DATA_FILE + '.gz'):
+            self.qtable.q_table = pd.read_pickle(DATA_FILE + '.gz', compression='gzip')
 
     def reset(self):
         super(SmartAgent, self).reset()
@@ -210,10 +214,17 @@ class SmartAgent(Agent):
 
     def step(self, obs):
         super(SmartAgent, self).step(obs)
+        if obs.last():
+            self.qtable.learn(self.previous_state, self.previous_action, obs.reward, 'terminal')
+            self.qtable.q_table.to_pickle(DATA_FILE + '.gz', 'gzip')
+            self.qtable.q_table.to_csv(DATA_FILE + '.csv')
+            self.previous_action = None
+            self.previous_state = None
+            return actions.RAW_FUNCTIONS.no_op()
         state = str(self.get_state(obs))
         action = self.qtable.choose_action(state)
         if self.previous_action is not None:
-            self.qtable.learn(self.previous_state, self.previous_action, obs.reward, 'terminal' if obs.last() else state)
+            self.qtable.learn(self.previous_state, self.previous_action, obs.reward, state)
         self.previous_state = state
         self.previous_action = action
         return getattr(self, action)(obs)
@@ -231,7 +242,7 @@ def main(unused_argv):
         with sc2_env.SC2Env(
                 map_name="Simple64",
                 players=[sc2_env.Agent(sc2_env.Race.terran),
-                         sc2_env.Agent(sc2_env.Race.terran)],
+                         sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
                 agent_interface_format = features.AgentInterfaceFormat(
                     action_space = actions.ActionSpace.RAW,
                     use_raw_units = True,
