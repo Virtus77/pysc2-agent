@@ -3,8 +3,14 @@ from pysc2.env import sc2_env
 from pysc2.lib import actions, features, units
 from absl import app
 import random
+import time
+
 
 class SimpleAgent(base_agent.BaseAgent):
+    def __init__(self):
+        super(SimpleAgent, self).__init__()
+        self.attack_coordinates = None
+        
     def unit_type_is_selected(self, obs, unit_type):
     # checks both the single and multi-selections to see if the first selected unit is the correct type
         if (len(obs.observation.single_select) > 0 and
@@ -24,6 +30,17 @@ class SimpleAgent(base_agent.BaseAgent):
         
     def step(self, obs):
         super(SimpleAgent, self).step(obs)
+        
+        if obs.first():
+            player_y, player_x = (obs.observation.feature_minimap.player_relative ==
+                                  features.PlayerRelative.SELF).nonzero()
+            xmean = player_x.mean()
+            ymean = player_y.mean()
+            
+            if xmean <= 31 and ymean <= 31:
+                self.attack_coordinates = (49,49)
+            else:
+                self.attack_coordinates = (12, 16)
         
         supply_depots = self.get_units_by_type(obs, units.Terran.SupplyDepot)
         if len(supply_depots) == 0:
@@ -48,6 +65,15 @@ class SimpleAgent(base_agent.BaseAgent):
                     x = random.randint(0, 83)
                     y = random.randint(0, 83)
                     return actions.FUNCTIONS.Build_SupplyDepot_screen("now", (x, y))
+                    
+        marines = self.get_units_by_type(obs, units.Terran.Marine)
+        if len(marines) >= 10:
+            if self.unit_type_is_selected(obs, units.Terran.Marine):
+                if self.can_do(obs, actions.FUNCTIONS.Attack_minimap.id):
+                    return actions.FUNCTIONS.Attack_minimap("now", self.attack_coordinates)
+                    
+            if self.can_do(obs, actions.FUNCTIONS.select_army.id):
+                return actions.FUNCTIONS.select_army("select")
                     
         barracks = self.get_units_by_type(obs, units.Terran.Barracks)
         if len(barracks) > 0:
